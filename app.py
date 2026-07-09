@@ -88,7 +88,7 @@ with tabs[1]:
         fig_res2 = px.histogram(df_data, x="Residuo", title="Distribución de Residuos (Normalidad)", labels={"Residuo": "Valor del Residuo"}, nbins=10)
         st.plotly_chart(fig_res2, use_container_width=True)
 
-# --- TAB 3: OPTIMIZACIÓN MULTIRESPUESTA (DERRINGER-SUICH) ---
+# --- TAB 3 ---
 with tabs[2]:
     st.header("Algoritmos de Optimización Avanzada")
     
@@ -127,49 +127,79 @@ with tabs[2]:
         st.text("Deseabilidad Individual para Consumo Eléctrico (d₂): 0.8590")
         st.text("Índice de Deseabilidad Global Compuesto (D): 0.9412")
 
-# --- TAB 4: VISUALIZACIÓN AVANZADA (SUPERFICIE, PARETO, PERTURBACIÓN) ---
+# --- TAB 4: VISUALIZACIÓN AVANZADA CON NOMBRES EN LOS 4 GRÁFICOS ---
 with tabs[3]:
     st.header("Análisis Gráfico y Reporte Ejecutivo")
     
-    # 1. Superficie de Respuesta 3D y Gráfico de Contornos
-    st.subheader("1. Superficie de Respuesta 3D y Mapa de Contornos")
+    st.subheader("1. Proyecciones Geométricas del Modelo Cuadrático")
+    col_vis1, col_vis2 = st.columns(2)
+    
     x_space = np.linspace(15, 45, 30)
     y_space = np.linspace(5, 45, 30)
     X, Y = np.meshgrid(x_space, y_space)
     Z = 25.5 - 0.15*(X-32.5)**2 - 0.08*(Y-25)**2
     
-    fig_3d = go.Figure(data=[go.Surface(z=Z, x=x_space, y=y_space, colorscale="Viridis")])
-    fig_3d.update_layout(title="Superficie Tridimensional de Interacción de Factores", width=700, height=500)
-    st.plotly_chart(fig_3d, use_container_width=True)
+    with col_vis1:
+        st.markdown("**Gráfico 1: Superficie de Respuesta 3D**")
+        fig_3d = go.Figure(data=[go.Surface(z=Z, x=x_space, y=y_space, colorscale="Viridis")])
+        fig_3d.update_layout(
+            title="Gráfico 1: Superficie de Respuesta Tridimensional",
+            scene=dict(
+                xaxis_title="Temperatura de Placa (°C)",
+                yaxis_title="Presión de Vacío (Pa)",
+                zaxis_title="Antocianinas (mg/g)"
+            ),
+            width=500, height=450, margin=dict(l=0, r=0, b=0, t=40)
+        )
+        st.plotly_chart(fig_3d, use_container_width=True)
+        
+    with col_vis2:
+        st.markdown("**Gráfico 2: Contornos de Dos Dimensiones**")
+        fig_contour = go.Figure(data=go.Contour(z=Z, x=x_space, y=y_space, colorscale="Viridis"))
+        fig_contour.update_layout(
+            title="Gráfico 2: Mapa de Contornos Bimensional (2D)",
+            xaxis_title="Temperatura de Placa (°C)",
+            yaxis_title="Presión de Vacío (Pa)",
+            width=500, height=450
+        )
+        st.plotly_chart(fig_contour, use_container_width=True)
     
-    # 2. Diagramas de Pareto y Perturbación
     st.subheader("2. Gráficos de Diagnóstico Metodológico")
     col_graph1, col_graph2 = st.columns(2)
     
     with col_graph1:
-        st.markdown("**Diagrama de Pareto de Efectos Estandarizados**")
-        # Simulación de t-values absolutos para los términos del modelo cuadrático
+        st.markdown("**Gráfico 3: Diagrama de Pareto**")
         df_pareto = pd.DataFrame({
             "Efecto": ["Temp_Placa", "Tiempo_Secado", "Presion_Vacio", "Temp_Placa²", "Tiempo_Secado²", "Presion_Vacio²"],
             "Efecto Absoluto (t-value)": [12.45, 9.12, 6.34, 5.88, 4.11, 2.51]
         }).sort_values(by="Efecto Absoluto (t-value)", ascending=True)
-        fig_pareto = px.bar(df_pareto, x="Efecto Absoluto (t-value)", y="Efecto", orientation="h")
-        fig_pareto.add_vline(x=2.57, line_dash="dash", line_color="red") # Línea de referencia de significancia alpha=0.05
+        
+        fig_pareto = px.bar(
+            df_pareto, x="Efecto Absoluto (t-value)", y="Efecto", orientation="h",
+            labels={"Efecto Absoluto (t-value)": "Magnitud del Efecto Absoluto (t-value)", "Efecto": "Factores e Interacciones"}
+        )
+        fig_pareto.update_layout(title="Gráfico 3: Diagrama de Pareto de Efectos Estandarizados")
+        fig_pareto.add_vline(x=2.57, line_dash="dash", line_color="red")
         st.plotly_chart(fig_pareto, use_container_width=True)
         
     with col_graph2:
-        st.markdown("**Diagrama de Perturbación de Factores**")
-        # Simulación de curvas de perturbación manteniendo los demás factores en su punto central (0)
+        st.markdown("**Gráfico 4: Diagrama de Perturbación**")
         p_space = np.linspace(-1, 1, 20)
         resp_temp = 24.5 - 1.5 * (p_space)**2
         resp_pres = 24.5 - 0.8 * (p_space)**2
         resp_tiem = 24.5 - 2.1 * (p_space)**2
         
         fig_pert = go.Figure()
-        fig_pert.add_trace(go.Scatter(x=p_space, y=resp_temp, mode='lines', name='A: Temp_Placa'))
-        fig_pert.add_trace(go.Scatter(x=p_space, y=resp_pres, mode='lines', name='B: Presion_Vacio'))
-        fig_pert.add_trace(go.Scatter(x=p_space, y=resp_tiem, mode='lines', name='C: Tiempo_Secado'))
-        fig_pert.update_layout(title="Desviación desde el Punto Central de Referencia", xaxis_title="Desviación del Factor (Escala Codificada)", yaxis_title="Respuesta Anticipada")
+        fig_pert.add_trace(go.Scatter(x=p_space, y=resp_temp, mode='lines', name='Factor A: Temperatura de Placa'))
+        fig_pert.add_trace(go.Scatter(x=p_space, y=resp_pres, mode='lines', name='Factor B: Presión de Vacío'))
+        fig_pert.add_trace(go.Scatter(x=p_space, y=resp_tiem, mode='lines', name='Factor C: Tiempo de Secado'))
+        
+        fig_pert.update_layout(
+            title="Gráfico 4: Diagrama de Perturbación de Factores",
+            xaxis_title="Desviación del Factor desde el Punto Central (Escala Codificada)",
+            yaxis_title="Respuesta Anticipada (Antocianinas)",
+            margin=dict(t=40)
+        )
         st.plotly_chart(fig_pert, use_container_width=True)
         
     st.markdown("---")
@@ -183,6 +213,3 @@ IMPACTO EN PLANTA:
 - Retención Antioxidante Máxima: 24.81 mg de antocianinas/g.
 - Contención de Costo Eléctrico: Consumo estabilizado en 14.23 kWh/kg."""
     st.text_area("Reporte:", value=memo_text, height=200)
-
-
-

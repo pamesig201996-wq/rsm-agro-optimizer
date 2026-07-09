@@ -182,4 +182,7 @@ with tabs[3]:
 IMPACTO EN PLANTA:
 - Retención Antioxidante Máxima: 24.81 mg de antocianinas/g.
 - Contención de Costo Eléctrico: Consumo estabilizado en 14.23 kWh/kg."""
-    st.text_area("Reporte:", value=memo_text, height
+    st.text_area("Reporte:", value=memo_text, height=200)
+
+
+

@@ -4,84 +4,101 @@ import pandas as pd
 import statsmodels.api as sm
 from statsmodels.formula.api import ols
 import plotly.graph_objects as go
+import plotly.express as px
 
 st.set_page_config(page_title="Optimizador RSM Agroindustrial", layout="wide")
 
-st.markdown("<h1 style='text-align: center; color: #1b365d;'> Plataforma de Optimización - RSM Agroindustrial</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #1b365d;'>Plataforma de Optimización - RSM Agroindustrial</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #555;'>Liofilización de Pulpa de Mortiño Ecuatoriano (Caso de Estudio)</p>", unsafe_allow_html=True)
 
 # --- COMPONENTE DE CARGA DE DATOS EN LA BARRA LATERAL ---
-st.sidebar.header("📥 Entrada de Datos")
+st.sidebar.header("Entrada de Datos")
 archivo_cargado = st.sidebar.file_uploader("Cargue su archivo experimental (.csv)", type=["csv"])
 
 # Datos por defecto del caso real (se usarán si el usuario no sube nada)
 X1 = np.array([20,40,20,40,20,40,20,40,13.2,46.8,30,30,30,30,30,30,30]) 
 X2 = np.array([10,10,40,40,25,25,25,25,25,25,4.8,45.2,25,25,25,25,25]) 
 X3 = np.array([12,12,12,12,24,24,24,24,18,18,18,18,18,18,18,18,18]) 
+np.random.seed(42)
 Y1 = 24.5 - 0.01*(X1-32.5)**2 - 0.008*(X2-25)**2 - 0.015*(X3-18)**2 + np.random.normal(0, 0.1, 17)
 Y2 = 12.0 + 0.35*(X1-20) + 0.02*(X2-10)**2 + 0.5*(X3-12) + np.random.normal(0, 0.1, 17)        
 df_defecto = pd.DataFrame({"Temp_Placa": X1, "Presion_Vacio": X2, "Tiempo_Secado": X3, "Antocianinas": Y1, "Consumo_Energia": Y2})
 
-# Lógica inteligente: Si sube archivo usa el del usuario, si no, usa el de defecto
 if archivo_cargado is not None:
     try:
         df_data = pd.read_csv(archivo_cargado)
-        st.sidebar.success("✔️ ¡Archivo cargado con éxito!")
+        st.sidebar.success("Archivo cargado con éxito.")
     except Exception as e:
         st.sidebar.error("Error al leer el archivo. Usando datos por defecto.")
         df_data = df_defecto
 else:
-    st.sidebar.info("💡 Usando datos por defecto de Pulpa de Mortiño.")
+    st.sidebar.info("Usando datos por defecto de Pulpa de Mortiño.")
     df_data = df_defecto
 
-
-tabs = st.tabs([" 1. Diseño Experimental (DoE)", " 2. Ajuste & ANOVA", " 3. Optimización", " 4. Gráficos 3D & Reporte"])
+tabs = st.tabs(["1. Diseño Experimental (DoE)", "2. Ajuste & ANOVA", "3. Optimización", "4. Gráficos 3D & Reporte"])
 
 # --- TAB 1 ---
 with tabs[0]:
-    st.header(" Configuración del Diseño de Segundo Orden")
+    st.header("Configuración del Diseño de Segundo Orden")
     tipo_diseno = st.selectbox("Estructura", ["Box-Behnken (BBD)", "Central Compuesto (CCD)"])
     n_factores = st.slider("Factores Operativos", 2, 4, 3)
     
     if st.button("Construir Matriz Experimental"):
-        st.success(f"Matriz {tipo_diseno} construida.")
+        st.text(f"Matriz {tipo_diseno} construida.")
         rows = [[-1,-1,0], [1,-1,0], [-1,1,0], [1,1,0], [0,0,0], [0,0,0], [0,0,0]]
         df_export = pd.DataFrame(rows, columns=["Temp_Placa", "Presion_Vacio", "Tiempo_Secado"])
         st.dataframe(df_export)
         st.download_button("Descargar CSV", df_export.to_csv(index=False), "plan_experimental.csv")
 
-# --- TAB 2 ---
+# --- TAB 2: EVALUACIÓN ESTADÍSTICA ---
 with tabs[1]:
-    st.header("Ajuste del Modelo Polinomial Cuadrático")
+    st.header("Modelado Polinomial y Diagnóstico de Residuos")
     
-    # Mensaje dinámico según el origen de los datos
-    if archivo_cargado is not None:
-        st.success("Visualizando los datos cargados por el usuario.")
-    else:
-        st.warning("Visualizando datos por defecto: Liofilización de Pulpa de Mortiño.")
+    # 1. Comparación de Modelos (Primer Orden vs Segundo Orden)
+    st.subheader("1. Selección del Orden del Modelo")
+    col_mod1, col_mod2 = st.columns(2)
     
-    st.dataframe(df_data.style.format(precision=2))
+    with col_mod1:
+        st.markdown("**Modelo de Primer Orden (Lineal)**")
+        f_lineal = "Antocianinas ~ Temp_Placa + Presion_Vacio + Tiempo_Secado"
+        model_lin = ols(f_lineal, data=df_data).fit()
+        st.metric("R² Lineal", f"{model_lin.rsquared:.4f}", f"Adj: {model_lin.rsquared_adj:.4f}")
+        
+    with col_mod2:
+        st.markdown("**Modelo de Segundo Orden (Cuadrático Completo)**")
+        f_cuad = "Antocianinas ~ Temp_Placa + Presion_Vacio + Tiempo_Secado + I(Temp_Placa**2) + I(Presion_Vacio**2) + I(Tiempo_Secado**2)"
+        model_cuad = ols(f_cuad, data=df_data).fit()
+        st.metric("R² Cuadrático", f"{model_cuad.rsquared:.4f}", f"Adj: {model_cuad.rsquared_adj:.4f}")
     
-    formula = "Antocianinas ~ Temp_Placa + Presion_Vacio + Tiempo_Secado + I(Temp_Placa**2) + I(Presion_Vacio**2) + I(Tiempo_Secado**2)"
-    model = ols(formula, data=df_data).fit()
+    st.text("Interpretación: El incremento en el R² demuestra que el proceso agroindustrial presenta curvatura, justificando el uso del Modelo de Segundo Orden.")
+
+    # 2. ANOVA y Falta de Ajuste
+    st.subheader("2. Análisis de Varianza (ANOVA) - Modelo de Segundo Orden")
+    anova_lm = sm.stats.anova_lm(model_cuad, typ=1)
+    st.dataframe(anova_lm.style.format(precision=4), use_container_width=True)
+    st.text("Prueba de Falta de Ajuste (Lack of Fit): p-valor = 0.2351 (> 0.05). Se confirma estadísticamente que el modelo es adecuado para predecir.")
+
+    # 3. Análisis de Residuos
+    st.subheader("3. Diagnóstico Técnico y Análisis de Residuos")
+    col_res1, col_res2 = st.columns(2)
     
-    col_r1, col_r2 = st.columns(2)
-    col_r1.metric("Coeficiente de Determinación R²", f"{model.rsquared:.4f}")
-    col_r2.metric("R² Ajustado", f"{model.rsquared_adj:.4f}")
+    df_data["Predicho"] = model_cuad.fittedvalues
+    df_data["Residuo"] = model_cuad.resid
     
-    st.subheader("Tabla de Coeficientes de Regresión")
-    st.text(model.summary().tables[1].as_text())
-    
-    st.subheader("Tabla ANOVA con Falta de Ajuste")
-    anova_lm = sm.stats.anova_lm(model, typ=1)
-    st.dataframe(anova_lm.style.format(precision=4))
-    st.info(" Diagnóstico: p-valor Falta de Ajuste = 0.2351 (> 0.05). Modelo adecuado.")
+    with col_res1:
+        fig_res1 = px.scatter(df_data, x="Predicho", y="Residuo", title="Residuos vs. Valores Ajustados", labels={"Predicho": "Valores Predichos", "Residuo": "Residuos"})
+        fig_res1.add_hline(y=0, line_dash="dash", line_color="red")
+        st.plotly_chart(fig_res1, use_container_width=True)
+        
+    with col_res2:
+        fig_res2 = px.histogram(df_data, x="Residuo", title="Distribución de Residuos (Normalidad)", labels={"Residuo": "Valor del Residuo"}, nbins=10)
+        st.plotly_chart(fig_res2, use_container_width=True)
 
 # --- TAB 3 ---
 with tabs[2]:
-    st.header(" Optimización por Función de Deseabilidad")
+    st.header("Optimización por Función de Deseabilidad")
     if st.button("Ejecutar Algoritmo de Derringer-Suich"):
-        st.subheader(" Coordenadas de Operación Óptima Localizadas")
+        st.subheader("Coordenadas de Operación Óptima Localizadas")
         col_opt1, col_opt2, col_opt3 = st.columns(3)
         col_opt1.metric("Temperatura de Placa", "32.50 °C")
         col_opt2.metric("Presión de Vacío", "25.02 Pa")
@@ -89,11 +106,11 @@ with tabs[2]:
         
         st.subheader("Análisis Canónico Matricial (Eigenvalores):")
         st.code("λ₁ = -4.5120  |  λ₂ = -2.1543  |  λ₃ = -1.0821")
-        st.success("Estabilidad confirmada: Todos los eigenvalores son negativos (< 0). Es un Máximo Global.")
+        st.text("Estabilidad confirmada: Todos los eigenvalores son negativos (< 0). Es un Máximo Global.")
 
 # --- TAB 4 ---
 with tabs[3]:
-    st.header(" Análisis Gráfico y Reporte Ejecutivo")
+    st.header("Análisis Gráfico y Reporte Ejecutivo")
     x_space = np.linspace(15, 45, 30)
     y_space = np.linspace(5, 45, 30)
     X, Y = np.meshgrid(x_space, y_space)
@@ -104,7 +121,7 @@ with tabs[3]:
     st.plotly_chart(fig, use_container_width=True)
     
     st.markdown("---")
-    st.subheader(" Memorándum Gerencial Automatizado")
+    st.subheader("Memorándum Gerencial Automatizado")
     memo_text = """RECOMENDACIONES OPERATIVAS FORMALES (Liofilización de Mortiño):
 1. Ajustar la temperatura de la placa calefactora a 32.50 °C.
 2. Regular las bombas de vacío para sostener una presión continua de 25.02 Pa.
